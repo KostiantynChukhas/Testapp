@@ -50,7 +50,23 @@ class ImagePicker: NSObject, PHPickerViewControllerDelegate, UINavigationControl
         viewController.present(camera, animated: true, completion: nil)
     }
 
-    // MARK: - PHPicker Delegate
+    private func compressImageToUnder5MB(_ image: UIImage) -> Data? {
+        var compressionQuality: CGFloat = 1.0
+        let maxFileSize = 2 * 1024 * 1024
+        
+        guard var data = image.jpegData(compressionQuality: compressionQuality) else { return nil }
+        
+        while data.count > maxFileSize && compressionQuality > 0 {
+            compressionQuality -= 0.1
+            if let newData = image.jpegData(compressionQuality: compressionQuality) {
+                data = newData
+            } else {
+                break
+            }
+        }
+        
+        return data.count <= maxFileSize ? data : nil
+    }
 
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true, completion: nil)
@@ -64,8 +80,12 @@ class ImagePicker: NSObject, PHPickerViewControllerDelegate, UINavigationControl
             result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
                 defer { group.leave() }
 
-                if let url = url, let image = UIImage(contentsOfFile: url.path),
-                   let data = image.jpegData(compressionQuality: 0.1) {
+                guard let url = url else { return }
+                let fileExtension = (url.lastPathComponent as NSString).pathExtension.lowercased()
+
+                if (fileExtension == "jpg" || fileExtension == "jpeg"),
+                   let image = UIImage(contentsOfFile: url.path),
+                   let data = self.compressImageToUnder5MB(image) {
                     selectedImages.append((data, url.lastPathComponent))
                 }
             }
@@ -80,13 +100,11 @@ class ImagePicker: NSObject, PHPickerViewControllerDelegate, UINavigationControl
         }
     }
 
-    // MARK: - UIImagePicker Delegate
-
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         picker.dismiss(animated: true, completion: nil)
 
         if let image = info[.originalImage] as? UIImage,
-           let data = image.jpegData(compressionQuality: 0.1) {
+           let data = compressImageToUnder5MB(image) {
             imagePickedBlock?([(data, "photo.jpg")])
         }
     }

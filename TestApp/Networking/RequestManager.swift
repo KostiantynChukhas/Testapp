@@ -121,8 +121,7 @@ extension RequestManager {
         let parameters: [String: Any] = requestItem.parameters() ?? [:]
         let headers: [String: String] = requestItem.headers() ?? [:]
         
-        guard let path = fullPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let fullPathUrl = URL(string: path) else {
+        guard let fullPathUrl = URL(string: fullPath) else {
             throw RequestError.invalidURL
         }
         
@@ -131,16 +130,19 @@ extension RequestManager {
         print("\n🔵 HEADERS \(headers)")
         print("🔵 MULTIPART POST \(fullPath)")
         print("🔵 PARAMS \(parameters) \n")
+        print("🔵 Uploading files: \(files.map { $0.fileName })")
         
-        let session = Session.default
         
-        let response = try await withCheckedThrowingContinuation { continuation in
-            session.upload(multipartFormData: { multipartFormData in
-                
-                if let jsonData = try? JSONSerialization.data(withJSONObject: parameters, options: []) {
-                    multipartFormData.append(jsonData, withName: "DATA_PACKET", mimeType: "application/json")
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.upload(multipartFormData: { multipartFormData in
+                // Добавляем каждый параметр формы
+                for (key, value) in parameters {
+                    if let data = "\(value)".data(using: .utf8) {
+                        multipartFormData.append(data, withName: key)
+                    }
                 }
                 
+                // Добавляем файл
                 for file in files {
                     multipartFormData.append(
                         file.data,
@@ -150,19 +152,23 @@ extension RequestManager {
                     )
                 }
             },
-                           to: fullPathUrl,
-                           method: .post,
-                           headers: httpHeaders)
+                      to: fullPathUrl,
+                      method: .post,
+                      headers: httpHeaders)
             .validate(statusCode: 200..<300)
             .responseDecodable(of: classType, decoder: decoder) { response in
                 switch response.result {
                 case .success(let value):
                     continuation.resume(returning: RequestResultCodableAsync(data: value))
                 case .failure(let error):
+                    if let data = response.data,
+                       let errorString = String(data: data, encoding: .utf8) {
+                        print("🔴 Server response: \(errorString)")
+                    }
+                    print("🔴 Error: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                 }
             }
         }
-        return response
     }
 }

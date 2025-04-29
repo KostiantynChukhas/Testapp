@@ -33,8 +33,15 @@ class UsersViewController: ViewController<UsersViewModel> {
         tableView.showsVerticalScrollIndicator = false
         tableView.dataSource = self
         tableView.delegate = self
+        tableView.refreshControl = refreshControl
         tableView.register(UsersCell.self, forCellReuseIdentifier: UsersCell.identifierCell)
         return tableView
+    }()
+    
+    private lazy var refreshControl: UIRefreshControl = {
+        let refreshControl = UIRefreshControl()
+        refreshControl.addTarget(self, action: #selector(refreshUsers), for: .valueChanged)
+        return refreshControl
     }()
     
     private var loadingFooterContainer: UIView = {
@@ -57,6 +64,7 @@ class UsersViewController: ViewController<UsersViewModel> {
     
     private var cancellables = Set<AnyCancellable>()
     private var loadMoreUsersSubject: PassthroughSubject<Void, Never> = .init()
+    private var refreshSubject: PassthroughSubject<Void, Never> = .init()
     
     override func setupView() {
         super.setupView()
@@ -84,7 +92,8 @@ class UsersViewController: ViewController<UsersViewModel> {
     override func setupOutput() {
         super.setupOutput()
         let input = UsersViewModel.Input(
-            loadMoreUsersPublisher: loadMoreUsersSubject.eraseToAnyPublisher()
+            loadMoreUsersPublisher: loadMoreUsersSubject.eraseToAnyPublisher(),
+            refreshPublisher: refreshSubject.eraseToAnyPublisher()
         )
         
         viewModel.transform(input, outputHandler: self.setupInput(input:))
@@ -102,9 +111,15 @@ class UsersViewController: ViewController<UsersViewModel> {
                 
                 self.tableView.reloadData()
                 self.emptyStackView.isHidden = !self.viewModel.users.isEmpty
+                self.refreshControl.endRefreshing()
             }
             .store(in: &cancellables)
     }
+    
+    @objc private func refreshUsers() {
+        refreshSubject.send()
+    }
+
 }
 
 extension UsersViewController: UITableViewDataSource {
@@ -134,6 +149,8 @@ extension UsersViewController: UITableViewDelegate {
         let height = scrollView.frame.size.height
         
         if offsetY > contentHeight - height - 50 && viewModel.currentPage <= viewModel.totalPages {
+            guard !viewModel.isRefreshing else { return } 
+            
             loadMoreUsersSubject.send()
             
             if !activityIndicator.isAnimating {

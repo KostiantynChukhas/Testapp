@@ -183,7 +183,7 @@ final class TextFieldView: BaseView {
 
     func setText(_ text: String?) {
         textField.text = text
-        updateTitle(isActive: true)
+        updateTitle(isActive: text == nil ? false : true)
     }
 
     func hideError() {

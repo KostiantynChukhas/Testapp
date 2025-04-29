@@ -26,6 +26,7 @@ class SignUpTextCell: BaseTableViewCell {
     
     func configure(_ type: FieldType) {
         self.type = type
+        textFieldView.setText(nil)
         textFieldView.setType(type: type)
         textFieldView.hintMessage = type == .phone ? Defines.phonePatern : ""
         textFieldView.alwaysShowHintInErrorLabel = type == .phone

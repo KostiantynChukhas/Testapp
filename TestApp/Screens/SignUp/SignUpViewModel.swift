@@ -76,8 +76,8 @@ extension SignUpViewModel: ViewModelProtocol {
     
     private func createUser() async -> Bool {
         do {
-            let response = try await userServie.createUser(model: signUpSectionsModel)
-            print(response)
+            let tokenResponse = try await userServie.getToken()
+            let response = try await userServie.createUser(model: signUpSectionsModel, token: tokenResponse.token)
             return response.success
         } catch {
             return false

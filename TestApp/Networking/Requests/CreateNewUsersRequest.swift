@@ -4,9 +4,11 @@ import Alamofire
 class CreateNewUsersRequest: BaseRequest {
     
     private var model: SignUpSectionsModel
+    private var token: String
     
-    init(model: SignUpSectionsModel) {
+    init(model: SignUpSectionsModel, token: String) {
         self.model = model
+        self.token = token
     }
     
     override func apiPath() -> String? {
@@ -14,15 +16,10 @@ class CreateNewUsersRequest: BaseRequest {
     }
     
     override func headers() -> [String : String]? {
-        let boundary = "Boundary-\(UUID().uuidString)"
-        let headers: [String : String]? = [
-            "Content-type": "application/json;charset=UTF-8",
-            "mimeType": "multipart/form-data; charset=utf-8",
-            "Content-Type": "multipart/form-data; charset=utf-8; boundary=\(boundary)",
-            "Token": "eyJpdiI6Im9mV1NTMlFZQTlJeWlLQ3liVks1MGc9PSIsInZhbHVlIjoiRTJBbUR4dHp1dWJ3ekQ4bG85WVZya3ZpRGlMQ0g5ZHk4M"
+        return [
+            "accept": "application/json;charset=UTF-8",
+            "Token": token
         ]
-        
-        return headers
     }
     
     override func parameters() -> [String : Any]? {
@@ -37,7 +34,11 @@ class CreateNewUsersRequest: BaseRequest {
     }
     
     func perform() async throws -> RequestResultCodableAsync<CreateUserModel> {
-        let files = [(data: model.imageValue?.0 ?? Data(), name: "FILE", fileName: "image.jpg", mimeType: "image/jpeg")]
+        var files: [(data: Data, name: String, fileName: String, mimeType: String)] = []
+        if let imageData = model.imageValue?.0, !imageData.isEmpty {
+            files.append((data: imageData, name: "photo", fileName: "image.jpg", mimeType: "image/jpeg"))
+        }
         return try await RequestManager.shared.performMultipartRequest(self, to: CreateUserModel.self, files: files)
     }
+
 }

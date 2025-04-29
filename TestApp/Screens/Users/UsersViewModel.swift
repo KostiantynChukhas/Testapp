@@ -10,6 +10,7 @@ class UsersViewModel {
     private(set) var currentPage: Int = 1
     private(set) var totalPages: Int = 1
     private(set) var isLoading: Bool = false
+    private(set) var isRefreshing: Bool = false
     private(set) var users: [User] = []
     
     
@@ -33,14 +34,26 @@ class UsersViewModel {
             }
             
             self?.isLoading = false
+            self?.isRefreshing = false
         }
     }
+    
+    private func refreshUsers() {
+        guard !isLoading else { return }
+        isRefreshing = true
+        currentPage = 1
+        totalPages = 1
+        users.removeAll()
+        getUsers(page: currentPage)
+    }
+
 }
 
 extension UsersViewModel: ViewModelProtocol {
     
     struct Input {
         let loadMoreUsersPublisher: AnyPublisher<Void, Never>
+        let refreshPublisher: AnyPublisher<Void, Never>
     }
     
     struct Output {
@@ -49,6 +62,8 @@ extension UsersViewModel: ViewModelProtocol {
     
     func transform(_ input: Input, outputHandler: @escaping (Output) -> Void) {
         setupLoadMoreUsers(input)
+        setupRefreshUsers(input)
+        
         let output = Output(
             reloadPublisher: reloadSubject.eraseToAnyPublisher()
         )
@@ -62,6 +77,15 @@ extension UsersViewModel: ViewModelProtocol {
                 guard let self else { return }
                 guard currentPage <= totalPages else { return }
                 getUsers(page: currentPage)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupRefreshUsers(_ input: Input) {
+        input.refreshPublisher
+            .sink { [weak self] _ in
+                guard let self else { return }
+                refreshUsers()
             }
             .store(in: &cancellables)
     }
